@@ -1,0 +1,149 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>weatherboard</title>
+        <style>
+        #table {
+            border: solid;
+        }
+        #table tr {
+            border: solid 1px;
+            margin: 1px;
+        }
+        #table tr td {
+            border: solid 1px;
+            padding: 1px;
+            font-size: 24px;
+        }
+        #table tr th {
+            border: solid 1px;
+            padding: 1px;
+            font-size: 24px;
+        }
+        </style>
+        <script type="text/javascript">
+            var j;
+            var isSetup = false;
+            //scrape() re-fetches JSON data from the server, tick() updates the table itself
+            function pad_ten(n) {
+                if (n < 10) {
+                    return ("0" + n);
+                } else {
+                    return n
+                }
+            }
+            function tick() {
+                if (!j) {
+                    return;
+                }
+                var table = document.getElementById("table");
+                for (var c = 0; c < j.length; c++) {
+                    var row;
+                    for (var tc = 1; tc < table.rows.length; tc++) { //1 to avoid fetching thead
+                        var crow = table.rows[tc];
+                        if (crow.cells[0].innerHTML == j[c].name) {
+                            row = crow;
+                            break;
+                        }
+                    }
+                    var offset = (Date.now() - j[c].timestamp) / 1000; //the number of seconds since the log
+                    var actualticks = (Date.now() - j[c].timestamp) / 50 + j[c].ticks;
+                    var seconds = Math.floor(offset + j[c].ticks / 20);
+                    var weatherseconds = Math.floor(j[c].weatherticks / 20 - offset);
+                    row.cells[1].innerHTML = Math.floor(seconds / 60) % 20 + ":" + pad_ten(seconds % 60);
+                    //following info ripped from wiki
+                    if (actualticks < 450 || actualticks > 23000) {
+                        row.cells[2].style["background-color"] = "orange";
+                        row.cells[2].innerHTML = "<strong>SUNRISE</strong>";
+                    } else if (actualticks >= 450 && actualticks < 12500) {
+                        row.cells[2].style["background-color"] = "orange";
+                        row.cells[2].innerHTML = "<strong>DAY</strong>";
+                    } else if (actualticks >= 12500 && actualticks < 13050) {
+                        row.cells[2].style["background-color"] = "red";
+                        row.cells[2].innerHTML = "<strong>SUNSET</strong>";
+                    } else if (actualticks >= 13050 && actualticks <= 23000) {
+                        row.cells[2].style["background-color"] = "blue";
+                        row.cells[2].innerHTML = "<strong>NIGHT</strong>";
+                    } else {
+                        row.cells[2].style["background-color"] = "white"
+                        row.cells[2].innerHTML = "<strong>UNKNOWN</strong>";
+                    }
+                    if (j[c].weather == "clear") {
+                        row.cells[3].style["background-color"] = "white";
+                        row.cells[3].style["color"] = "black";
+                        row.cells[3].innerHTML = "<strong>CLEAR</strong>";
+                    } else if (j[c].weather == "storm") {
+                        row.cells[3].style["color"] = "black";
+                        row.cells[3].style["background-color"] = "gray";
+                        row.cells[3].innerHTML = "<strong>STORM</strong>";
+                    } else if (j[c].weather == "thunder") {
+                        row.cells[3].style["background-color"] = "black";
+                        row.cells[3].style["color"] = "white";
+                        row.cells[3].innerHTML = "<strong>THUNDER</strong>";
+                    } else {
+                        row.cells[3].style["background-color"] = "white"
+                        row.cells[3].innerHTML = "<strong>UNKNOWN</strong>"
+                    }
+                    if (j[c].weather != "clear") {
+                        if (weatherseconds < 0) {
+                            row.cells[4].innerHTML = "0:00";
+                        } else {
+                            row.cells[4].innerHTML = Math.floor(weatherseconds / 60) + ":" + pad_ten(weatherseconds % 60);
+                        }
+                    } else {
+                        row.cells[4].innerHTML = "N/A";
+                    }
+                }
+            }
+            function scrape() {
+                var r = new XMLHttpRequest();
+                r.onreadystatechange = function() {
+                    if (this.readyState == 4 && this.status == 200) {
+                        j = JSON.parse(this.responseText);
+                        if (!isSetup) {
+                            var tab = document.getElementById("tbody");
+                            for (var r = 0; r < j.length; r++) {
+                                var ro = document.createElement("tr");
+                                for (var x = 0; x < 5; x++) {
+                                    var d = document.createElement("td");
+                                    if (x == 0) {
+                                        d.appendChild(document.createTextNode(j[r].name));
+                                    }
+                                    ro.appendChild(d);
+                                }
+                                tab.appendChild(ro);
+                                tick();
+                                window.setInterval(scrape, 5000);
+                                window.setInterval(tick, 20);
+                                isSetup = true;
+                            }
+                        }
+                    }
+                }
+                r.open("GET", "https://fluffybread.net/diurnal.json", true);
+                r.send(null);
+            }
+            window.onload = function() {
+                scrape();
+            }
+        </script>
+	</head>
+	<body>
+	<h1>WEATHERBOARD</h1>
+    <h2>Each day is 20 minutes long. Daylight is from approximately 0:00 to 11:00, night is from 11:00 to 20:00.</h2>
+    <table id="table">
+        <thead>
+            <tr>
+                <th>WORLD NAME</th>
+                <th>TIME</th>
+                <th>PHASE</th>
+                <th>WEATHER</th>
+                <th>REMAINING TIME IN CURRENT WEATHER</th>
+            </tr>
+        </thead>
+        <tbody id="tbody">
+        </tbody>
+    </table>
+	</body>
+</html>
